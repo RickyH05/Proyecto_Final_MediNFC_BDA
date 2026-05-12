@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid stats-grid-4">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Médicos activos</div>
+      <div class="stat-value" style="color:#1B4F72;">{{ total_medicos }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="stethoscope" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Cuidadores activos</div>
+      <div class="stat-value" style="color:#1ABC9C;">{{ total_cuidadores }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="users" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Medicamentos en catálogo</div>
+      <div class="stat-value" style="color:#8E44AD;">{{ total_medicamentos }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(142,68,173,.12);">
+      <i data-lucide="pill" style="width:22px;height:22px;color:#8E44AD;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Pacientes activos</div>
+      <div class="stat-value" style="color:#27AE60;">{{ total_pacientes }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(39,174,96,.12);">
+      <i data-lucide="user-check" style="width:22px;height:22px;color:#27AE60;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Dispositivos IoT -->
+<div class="stats-grid stats-grid-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Dispositivos GPS activos</div>
+      <div class="stat-value" style="color:#1B4F72;">{{ total_gps }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.08);">
+      <i data-lucide="smartphone" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Beacons BLE activos</div>
+      <div class="stat-value" style="color:#1ABC9C;">{{ total_beacons }}</div>
+      <div class="stat-sub">instalados en domicilios</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="radio" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div>
+      <div class="stat-label">Alertas pendientes</div>
+      <div class="stat-value" style="color:#E74C3C;">{{ total_alertas }}</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(231,76,60,.10);">
+      <i data-lucide="bell" style="width:22px;height:22px;color:#E74C3C;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Actividad reciente -->
+<div class="card">
+  <div class="card-header">
+    <h3>Actividad reciente</h3>
+    <a href="{{ url_for('admin_auditoria') }}" class="btn btn-ghost btn-sm">Ver todo →</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Usuario</th><th>Operación</th><th>Tabla afectada</th><th>Fecha/Hora</th>
+      </tr></thead>
+      <tbody>
+        {% for a in actividad_reciente %}
+        {# a: (0=usuario, 1=accion, 2=tabla, 3=ts) #}
+        <tr data-searchable>
+          <td>{{ a[0] or '—' }}</td>
+          <td>
+            {% if a[1] == 'INSERT' %}<span class="badge badge-green">INSERT</span>
+            {% elif a[1] == 'UPDATE' %}<span class="badge badge-yellow">UPDATE</span>
+            {% elif a[1] == 'DELETE' %}<span class="badge badge-red">DELETE</span>
+            {% else %}<span class="badge badge-gray">{{ a[1] }}</span>{% endif %}
+          </td>
+          <td style="font-family:monospace;font-size:13px;">{{ a[2] }}</td>
+          <td style="color:#5D6D7E;font-size:13px;">{{ a[3] }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:24px;">Sin actividad reciente.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<!-- Accesos rápidos reportes -->
+<div class="stats-grid stats-grid-3" style="margin-top:20px;">
+  <a href="{{ url_for('admin_reporte_ranking_mejora') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Ranking mejora adherencia</div>
+      <div class="stat-value" style="color:#1B4F72;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="trophy" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reporte_tendencia_global') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Tendencia global adherencia</div>
+      <div class="stat-value" style="color:#1ABC9C;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);">
+      <i data-lucide="trending-up" style="width:22px;height:22px;color:#1ABC9C;"></i>
+    </div>
+  </a>
+</div>
+{% endblock %}
+{% block scripts %}<script>lucide.createIcons();</script>{% endblock %}

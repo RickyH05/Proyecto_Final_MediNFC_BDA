@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Inicio — Cuidador{% endblock %}
+{% block page_title %}Inicio{% endblock %}
+{% block content %}
+<div style="margin-bottom:20px;">
+  <p style="font-size:14px;color:#5D6D7E;">{{ fecha_hoy }}</p>
+</div>
+<div class="stats-grid stats-grid-3" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div><div class="stat-label">Pacientes hoy</div><div class="stat-value" style="color:#1B4F72;">{{ pacientes|length }}</div></div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);"><i data-lucide="users" style="width:22px;height:22px;color:#1B4F72;"></i></div>
+  </div>
+  <div class="stat-card">
+    <div><div class="stat-label">Tomas registradas</div><div class="stat-value" style="color:#1ABC9C;">{{ stats.tomas_ok }}</div></div>
+    <div class="stat-icon" style="background:rgba(26,188,156,.12);"><i data-lucide="check-circle" style="width:22px;height:22px;color:#1ABC9C;"></i></div>
+  </div>
+  <div class="stat-card">
+    <div><div class="stat-label">Alertas pendientes</div><div class="stat-value" style="color:#E74C3C;">{{ stats.alertas_pend }}</div></div>
+    <div class="stat-icon" style="background:rgba(231,76,60,.10);"><i data-lucide="bell" style="width:22px;height:22px;color:#E74C3C;"></i></div>
+  </div>
+  <a href="{{ url_for('cuidador_grafica_adherencia') }}" class="stat-card" style="text-decoration:none;">
+    <div>
+      <div class="stat-label">Mi gráfica de adherencia</div>
+      <div class="stat-value" style="color:#1B4F72;font-size:16px;margin-top:4px;">Ver →</div>
+    </div>
+    <div class="stat-icon" style="background:rgba(27,79,114,.10);">
+      <i data-lucide="bar-chart-2" style="width:22px;height:22px;color:#1B4F72;"></i>
+    </div>
+  </a>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3>Mi Dispositivo GPS</h3>
+    <a href="{{ url_for('cuidador_mi_gps') }}" class="btn btn-ghost btn-sm">Ver detalle →</a>
+  </div>
+  <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+    <div style="width:48px;height:48px;border-radius:12px;background:rgba(26,188,156,.12);display:flex;align-items:center;justify-content:center;">
+      <i data-lucide="map-pin" style="width:24px;height:24px;color:#1ABC9C;"></i>
+    </div>
+    {% if gps_resumen %}
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:14px;">
+        {{ gps_resumen.modelo }}
+        <span style="font-family:monospace;font-weight:400;font-size:13px;">· {{ gps_resumen.imei }}</span>
+      </div>
+      <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">
+        {% if gps_resumen.lat %}
+          Última posición: {{ "%.4f"|format(gps_resumen.lat) }}, {{ "%.4f"|format(gps_resumen.lon) }}
+          {% if gps_resumen.ts %} · {{ gps_resumen.ts }}{% endif %}
+        {% else %}
+          Sin posición registrada
+        {% endif %}
+      </div>
+    </div>
+    <span class="badge {% if gps_resumen.activo %}badge-green{% else %}badge-gray{% endif %}">
+      {{ 'Activo' if gps_resumen.activo else 'Inactivo' }}
+    </span>
+    {% else %}
+    <div style="flex:1;font-size:13px;color:#9CA3AF;">Sin dispositivo GPS asignado.</div>
+    {% endif %}
+  </div>
+</div>
+
+<a href="{{ url_for('cuidador_nfc_nuevo') }}" class="stat-card" style="text-decoration:none;margin-bottom:20px;display:flex;">
+  <div>
+    <div class="stat-label">Pastillero NFC</div>
+    <div style="font-size:14px;font-weight:600;color:#1B4F72;margin-top:4px;">Vincular nuevo →</div>
+    <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">Asigna una etiqueta NFC a un medicamento</div>
+  </div>
+  <div class="stat-icon" style="background:rgba(26,188,156,.12);margin-left:auto;">
+    <i data-lucide="wifi" style="width:22px;height:22px;color:#1ABC9C;transform:rotate(90deg);"></i>
+  </div>
+</a>
+
+<h2 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin-bottom:14px;">Mis Pacientes</h2>
+{% if pacientes %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+  {% for p in pacientes %}
+  {% set adh = ((p.tomas_ok / p.total_tomas) * 100)|int if p.total_tomas > 0 else 0 %}
+  <a href="{{ url_for('cuidador_paciente', id=p.id) }}" class="patient-card">
+    <div style="flex:1;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        {{ avatar(p.foto if p.foto is defined else '', p.nombre, 36) }}
+        <div style="font-weight:600;font-size:14px;">{{ p.nombre }}</div>
+        {% if p.alertas > 0 %}
+        <span style="margin-left:auto;font-size:16px;">🔴</span>
+        {% else %}
+        <span style="margin-left:auto;font-size:16px;">🟢</span>
+        {% endif %}
+      </div>
+      <div style="margin-bottom:6px;">
+        {% if p.turno_estado == 'en_turno' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(26,188,156,.15);color:#1ABC9C;">● En turno</span>
+        {% elif p.turno_estado == 'proximo' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(243,156,18,.15);color:#F39C12;">◑ Próximo · {{ p.turno_hora }}</span>
+        {% elif p.turno_estado == 'fuera_turno' %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(156,163,175,.15);color:#9CA3AF;">○ Fuera de turno</span>
+        {% else %}
+        <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(156,163,175,.10);color:#C0C8D2;">— Sin turno hoy</span>
+        {% endif %}
+      </div>
+      <div style="font-size:12px;color:#5D6D7E;margin-bottom:8px;">
+        {{ p.meds }} medicamentos{% if p.next %} · Próxima: {{ p.next }}{% endif %}
+      </div>
+      <div class="adherence-bar">
+        <div class="adherence-track"><div class="adherence-fill" data-value="{{ adh }}"></div></div>
+        <span class="adherence-label" style="font-size:12px;color:{% if adh >= 80 %}#1ABC9C{% elif adh >= 50 %}#F39C12{% else %}#E74C3C{% endif %};">{{ adh }}%</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="font-size:14px;color:#5D6D7E;">No hay pacientes asignados para hoy.</p>
+{% endif %}
+{% if paciente_principal_id %}
+<div id="gps-tracker-data"
+     data-id-paciente="{{ paciente_principal_id }}"
+     data-nombre-paciente="{{ paciente_principal_nombre }}"
+     style="display:none;"></div>
+<div id="gps-status" title="GPS activo"
+     style="position:fixed;bottom:80px;right:20px;width:12px;height:12px;
+            border-radius:50%;background:#9CA3AF;opacity:0.8;z-index:999;"></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% if paciente_principal_id %}
+<script src="{{ url_for('static', filename='js/gps_tracker.js') }}"></script>
+{% endif %}
+{% endblock %}

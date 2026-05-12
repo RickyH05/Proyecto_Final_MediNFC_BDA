@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+{% block page_title %}Reportes{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Reportes</h1><p>Analizando los últimos <strong>{{ dias }}</strong> días</p></div>
+</div>
+
+<!-- Filtro de período -->
+<form method="get" action="{{ url_for('doctor_reportes') }}" class="card" style="padding:14px 16px;margin-bottom:20px;">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin:0;">
+      <label class="form-label" style="font-size:12px;">Período (días)</label>
+      <select name="dias" class="form-control" style="max-width:160px;">
+        {% for d in [7, 14, 30, 60, 90] %}
+        <option value="{{ d }}" {% if dias == d %}selected{% endif %}>Últimos {{ d }} días</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
+  </div>
+</form>
+
+<!-- Adherencia por paciente -->
+{% if pacientes_adh %}
+<div class="stats-grid stats-grid-4" style="margin-bottom:24px;">
+  {% for r in pacientes_adh %}
+  <div class="card" style="box-shadow:var(--shadow-sm);">
+    <div class="card-body" style="padding:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="patient-avatar" style="width:36px;height:36px;font-size:12px;">{{ r.nombre[:2].upper() }}</div>
+        <a href="{{ url_for('doctor_paciente_perfil', id=r.id) }}"
+           style="font-weight:600;font-size:13px;color:#2C3E50;text-decoration:none;word-break:break-word;">{{ r.nombre }}</a>
+      </div>
+      <div id="gauge_{{ loop.index0 }}" style="height:110px;"></div>
+      <div style="font-size:12px;color:#5D6D7E;display:flex;flex-direction:column;gap:2px;margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;"><span>Total:</span><span style="font-weight:500;color:#2C3E50;">{{ (r.ok or 0) + (r.tarde or 0) + (r.omitida or 0) }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>A tiempo:</span><span style="font-weight:500;color:#1ABC9C;">{{ r.ok or 0 }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Tardías:</span><span style="font-weight:500;color:#F39C12;">{{ r.tarde or 0 }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Omisiones:</span><span style="font-weight:500;color:#E74C3C;">{{ r.omitida or 0 }}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Pendientes:</span><span style="font-weight:500;color:#9CA3AF;">{{ r.pend or 0 }}</span></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="card-body">
+  <div class="empty-state">
+    <div class="empty-icon"><i data-lucide="bar-chart-2" style="width:40px;height:40px;color:#9CA3AF;"></i></div>
+    <p>Sin datos de adherencia para los últimos {{ dias }} días.</p>
+    <small>Verifica que existan recetas vigentes con agendas registradas.</small>
+  </div>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% for r in pacientes_adh %}
+{% if r.pct is not none %}
+{% set adh_v = (r.pct | float) | round | int %}
+{% set clr = '#1ABC9C' if adh_v >= 80 else ('#F39C12' if adh_v >= 50 else '#E74C3C') %}
+Highcharts.chart('gauge_{{ loop.index0 }}', {
+  chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 110, margin: [0,0,0,0], spacing: [0,0,0,0] },
+  title: null,
+  pane: { center: ['50%','85%'], size: '100%', startAngle: -90, endAngle: 90,
+    background: { backgroundColor: '#EEF2F7', innerRadius: '55%', outerRadius: '100%', shape: 'arc', borderWidth: 0 } },
+  tooltip: { enabled: false },
+  yAxis: { min: 0, max: 100, lineWidth: 0, tickWidth: 0, minorTickInterval: null, labels: { enabled: false } },
+  plotOptions: { solidgauge: { dataLabels: { y: -22, borderWidth: 0, useHTML: true }, rounded: true } },
+  series: [{ name: 'Adherencia', data: [{{ adh_v }}], color: '{{ clr }}',
+    dataLabels: { format: '<span style="font-size:14px;font-weight:700;color:{{ clr }}">{y}%</span>' } }],
+  credits: { enabled: false }
+});
+{% else %}
+document.getElementById('gauge_{{ loop.index0 }}').innerHTML =
+  '<div style="height:110px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#9CA3AF;">Sin datos</div>';
+{% endif %}
+{% endfor %}
+</script>
+{% endblock %}

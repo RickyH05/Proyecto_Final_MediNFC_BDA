@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Diagnosticos{% endblock %}
+{% block page_title %}Diagnosticos{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Diagnosticos</h1><p>Catalogo de diagnosticos clinicos</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-dx');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar diagnostico..."/>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Descripcion</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for d in diagnosticos %}
+        {# d: (0=id, 1=descripcion) #}
+        <tr data-searchable>
+          <td style="color:#9CA3AF;font-size:13px;">{{ d[0] }}</td>
+          <td style="font-weight:500;">{{ d[1] }}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editDx({{ d[0] }},'{{ d[1]|e }}')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo / editar -->
+<div id="modal-dx" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-dx')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-dx-title">Nuevo Diagnostico</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-dx')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_diagnosticos') }}">
+      <input type="hidden" id="dx-acc" name="acc" value="I">
+      <input type="hidden" id="dx-id" name="id_diagnostico" value="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Descripcion *</label>
+          <input class="form-control" id="dx-desc" name="descripcion" placeholder="Ej: Diabetes Tipo 2"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-dx')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-dx-title').textContent='Nuevo Diagnostico';
+  document.getElementById('dx-acc').value='I';
+  document.getElementById('dx-id').value='';
+  document.getElementById('dx-desc').value='';
+}
+function editDx(id,desc){
+  document.getElementById('modal-dx-title').textContent='Editar Diagnostico';
+  document.getElementById('dx-acc').value='U';
+  document.getElementById('dx-id').value=id;
+  document.getElementById('dx-desc').value=desc;
+  openModal('modal-dx'); lucide.createIcons();
+}
+</script>{% endblock %}

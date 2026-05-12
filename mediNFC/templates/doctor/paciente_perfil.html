@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Perfil Paciente{% endblock %}
+{% block page_title %}Perfil del Paciente{% endblock %}
+
+{% block content %}
+<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="{{ url_for('doctor_pacientes') }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver a Pacientes
+  </a>
+  <a href="{{ url_for('doctor_grafica_tomas', id_pac=id) }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="bar-chart-2" style="width:15px;height:15px;"></i> Gráfica de tomas
+  </a>
+  <a href="{{ url_for('doctor_tendencia', id_pac=id) }}" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+    <i data-lucide="trending-up" style="width:15px;height:15px;"></i> Ver tendencia
+  </a>
+</div>
+
+<!-- Header paciente -->
+<div style="background:#ffffff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px;">
+  <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+    {{ avatar(paciente.foto if paciente.foto is defined else '', paciente.nombre, 56) }}
+    <div style="flex:1;">
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;color:#2C3E50;">{{ paciente.nombre }}</h2>
+      <div style="font-size:12px;color:#5D6D7E;font-family:monospace;margin-bottom:8px;">{{ paciente.curp }}</div>
+      {% if paciente.diagnosticos %}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+        {% for dx in paciente.diagnosticos.split(',') %}
+        <span class="badge badge-blue">{{ dx.strip() }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if diagnosticos_catalogo %}
+      <form method="POST" action="{{ url_for('medico_asignar_diagnostico', id_pac=paciente.id) }}"
+            style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+        <select name="id_diagnostico" class="form-control" style="min-width:200px;max-width:320px;font-size:13px;">
+          <option value="">-- Asignar diagnóstico --</option>
+          {% for d in diagnosticos_catalogo %}
+          <option value="{{ d[0] }}">{{ d[1] }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i data-lucide="plus" style="width:13px;height:13px;"></i> Asignar
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    <div style="text-align:center;min-width:100px;">
+      <div id="gauge_perfil" style="height:90px;width:110px;"></div>
+      <div style="font-size:12px;color:#5D6D7E;margin-top:-6px;">Adherencia</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div style="background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+
+  <!-- Tab buttons -->
+  <div style="display:flex;border-bottom:1px solid #E8ECF0;overflow-x:auto;">
+    {% for tab in [
+      ("tab-recetas",  "Recetas",       "clipboard-list"),
+      ("tab-eventos",  "Eventos NFC",   "radio"),
+      ("tab-cuids",    "Cuidadores",    "users"),
+      ("tab-alertas",  "Alertas",       "bell")
+    ] %}
+    <button onclick="showTab('{{ tab[0] }}', this)"
+      id="btn-{{ tab[0] }}"
+      style="display:flex;align-items:center;gap:6px;padding:14px 20px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;min-height:48px;transition:all .18s;
+        {% if loop.first %}color:#1B4F72;border-bottom:2px solid #1B4F72;{% else %}color:#5D6D7E;border-bottom:2px solid transparent;{% endif %}">
+      <i data-lucide="{{ tab[2] }}" style="width:15px;height:15px;"></i> {{ tab[1] }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- ── TAB: Recetas ── -->
+  <div id="tab-recetas" style="padding:20px;display:block;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Recetas del paciente</h3>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-nueva-receta')">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> Nueva Receta
+      </button>
+    </div>
+    {% for rx in recetas %}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;margin-bottom:10px;
+      border-left:3px solid {% if rx.estado=='vigente' %}#1ABC9C{% elif rx.estado=='cancelada' %}#E74C3C{% else %}#9CA3AF{% endif %};">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+        <div>
+          <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ rx.inicio }} — {{ rx.medico }}</div>
+          <div style="font-size:12px;color:#5D6D7E;">{{ rx.inicio }} → {{ rx.fin }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="badge {% if rx.estado=='vigente' %}badge-green{% elif rx.estado=='cancelada' %}badge-red{% else %}badge-gray{% endif %}">
+            {{ rx.estado|capitalize }}
+          </span>
+          {% if rx.estado == 'vigente' %}
+          <form method="POST" action="{{ url_for('doctor_receta_cancelar', id_receta=rx.id) }}"
+            style="display:inline;"
+            onsubmit="return confirm('¿Cancelar esta receta? Se marcarán las tomas pendientes como omitidas.')">
+            <input type="hidden" name="id_paciente" value="{{ id }}">
+            <button type="submit" class="btn btn-ghost btn-sm" style="color:#E74C3C;">
+              <i data-lucide="x-circle" style="width:13px;height:13px;"></i> Cancelar
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        {% for m in rx.meds %}
+        {% set uid = etiquetas_nfc.get(m.id_rm) %}
+        <div style="background:#F4F6F8;border-radius:6px;padding:8px 12px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+          <strong style="color:#2C3E50;">{{ m.nombre }} {{ m.dosis }}{{ m.unidad }}</strong>
+          <span style="color:#5D6D7E;">Cada {{ m.frecuencia_h }}h</span>
+          <span style="color:#5D6D7E;display:flex;align-items:center;gap:3px;">
+            <i data-lucide="clock" style="width:11px;height:11px;"></i> {{ m.hora }}
+          </span>
+          <span style="color:#5D6D7E;">Tolerancia: {{ m.tolerancia }} min</span>
+          {% if uid %}
+          <span style="font-size:11px;background:rgba(26,188,156,.12);color:#0F6E56;padding:2px 8px;border-radius:12px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+            <i data-lucide="wifi" style="width:11px;height:11px;"></i> NFC activo
+          </span>
+          <form method="POST"
+            action="{{ url_for('doctor_nfc_desactivar', id_pac=id, uid=uid) }}"
+            style="display:inline;"
+            onsubmit="return confirm('¿Desactivar NFC {{ uid }}?')">
+            <button type="submit" class="btn btn-ghost btn-sm"
+              style="color:#E74C3C;font-size:11px;padding:2px 6px;">
+              <i data-lucide="unlink" style="width:11px;height:11px;"></i> Desvincular
+            </button>
+          </form>
+          {% else %}
+          <span style="font-size:11px;color:#9CA3AF;display:inline-flex;align-items:center;gap:3px;">
+            <i data-lucide="wifi-off" style="width:11px;height:11px;"></i> Sin NFC
+          </span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Este paciente no tiene recetas.</p>
+    {% endfor %}
+  </div>
+
+  <!-- ── TAB: Eventos NFC ── -->
+  <div id="tab-eventos" style="padding:20px;display:none;">
+    <h3 style="font-size:15px;font-weight:600;color:#2C3E50;margin-bottom:16px;">Eventos NFC (últimos 14 días)</h3>
+    {% if historial %}
+    <div>
+      {% for ev in historial %}
+      {% if ev.resultado == 'Exitoso' %}{% set dot = 'green' %}
+      {% elif ev.resultado == 'Tardío' %}{% set dot = 'yellow' %}
+      {% else %}{% set dot = 'red' %}{% endif %}
+      <div class="timeline-item">
+        <div class="timeline-spine">
+          <div class="timeline-dot {{ dot }}"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="timeline-content">
+          <div class="timeline-card">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+              <span style="font-size:12px;color:#5D6D7E;">{{ ev.timestamp }}</span>
+              <span class="badge {% if ev.resultado=='Exitoso' %}badge-green{% elif ev.resultado=='Tardío' %}badge-yellow{% else %}badge-red{% endif %}">
+                {{ ev.resultado }}
+              </span>
+              {% if ev.desfase_min %}
+              <span style="font-size:11px;color:#9CA3AF;">{{ ev.desfase_min }} min</span>
+              {% endif %}
+            </div>
+            <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ ev.medicamento }}</div>
+            <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">
+              Por {{ ev.cuidador }} · {{ ev.origen }}
+              {% if not ev.proximidad %}<span style="color:#E74C3C;"> · ⚠️ Fuera de rango</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Sin eventos NFC en los últimos 14 días.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── TAB: Cuidadores ── -->
+  <div id="tab-cuids" style="padding:20px;display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Cuidador principal</h3>
+      <a href="{{ url_for('doctor_asignar_cuidador', id=id) }}" class="btn btn-primary btn-sm">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> Asignar
+      </a>
+    </div>
+    {% if vinculos %}
+    {% for r in vinculos %}
+    {# cols: id_paciente_cuidador[0], id_cuidador[1], es_principal[2], activo[3], cuidador[4] #}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:{% if r[2] %}#1ABC9C{% else %}#9CA3AF{% endif %};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">
+          {{ r[4][:2].upper() if r[4] else '?' }}
+        </div>
+        <div style="flex:1;">
+          <a href="{{ url_for('doctor_cuidador_detalle', id_pac=paciente.id, id_cuid=r[1]) }}"
+             style="font-weight:500;font-size:14px;color:#2C3E50;text-decoration:none;">
+            {{ r[4] }}
+          </a>
+        </div>
+        {% if r[2] %}
+        <span class="badge badge-green">Principal</span>
+        {% else %}
+        <span class="badge badge-gray">Apoyo</span>
+        <button onclick="desasignarCuidador({{ r[0] }}, '{{ r[4] }}')"
+          class="btn btn-ghost btn-icon btn-sm" title="Desasignar"
+          style="margin-left:4px;">
+          <i data-lucide="user-x" style="width:14px;height:14px;color:#E74C3C;"></i>
+        </button>
+        {% endif %}
+        <i data-lucide="chevron-right" style="width:14px;height:14px;color:#9CA3AF;"></i>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">Sin cuidador asignado.</p>
+    {% endif %}
+  </div>
+
+<!-- Modal confirmar desasignar -->
+<div id="modal-desasignar" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-desasignar')" style="display:none;">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar desasignación</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-desasignar')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('doctor_desasignar_cuidador', id_pac=id) }}">
+      <input type="hidden" id="del-vinculo-id" name="id_paciente_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="del-vinculo-nombre" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:4px;"></div>
+            <div style="font-size:13px;color:#5D6D7E;">Se desasignará este cuidador del paciente.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-desasignar')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" style="background:#E74C3C;border-color:#E74C3C;">
+          <i data-lucide="user-x" style="width:14px;height:14px;"></i> Desasignar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+  <!-- ── TAB: Alertas ── -->
+  <div id="tab-alertas" style="padding:20px;display:none;">
+
+    <!-- Filtro Pendientes / Todas -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <h3 style="font-size:15px;font-weight:600;color:#2C3E50;">Alertas del paciente</h3>
+      <div style="display:flex;gap:6px;">
+        <a href="?filtro_alertas=pendientes#tab-alertas"
+           onclick="sessionStorage.setItem('tab_perfil','tab-alertas')"
+           class="btn btn-sm {% if solo_pend_alertas %}btn-primary{% else %}btn-ghost{% endif %}">
+          Pendientes
+        </a>
+        <a href="?filtro_alertas=todas#tab-alertas"
+           onclick="sessionStorage.setItem('tab_perfil','tab-alertas')"
+           class="btn btn-sm {% if not solo_pend_alertas %}btn-primary{% else %}btn-ghost{% endif %}">
+          Todas
+        </a>
+      </div>
+    </div>
+
+    <!-- Lista de alertas -->
+    {% for a in alertas %}
+    <div style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+        <span class="badge {% if 'Omis' in a.tipo %}badge-red{% else %}badge-yellow{% endif %}">{{ a.tipo }}</span>
+        <span class="badge {% if a.estado == 'Pendiente' %}badge-yellow{% else %}badge-green{% endif %}">{{ a.estado }}</span>
+        <span class="badge {% if a.prioridad == 'Alta' %}badge-red{% elif a.prioridad == 'Media' %}badge-yellow{% else %}badge-green{% endif %}">{{ a.prioridad }}</span>
+      </div>
+      <div style="font-weight:500;font-size:14px;color:#2C3E50;">{{ a.medicamento }}</div>
+      <div style="font-size:12px;color:#5D6D7E;margin-top:2px;">{{ a.timestamp }}</div>
+    </div>
+    {% else %}
+    <p style="font-size:14px;color:#9CA3AF;">No hay alertas {{ 'pendientes' if solo_pend_alertas else '' }} para este paciente.</p>
+    {% endfor %}
+
+    <!-- Sección observaciones de alertas atendidas -->
+    {% if observaciones_atendidas %}
+    <div style="margin-top:24px;">
+      <h4 style="font-size:14px;font-weight:600;color:#2C3E50;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+        <i data-lucide="clipboard-list" style="width:15px;height:15px;color:#1ABC9C;"></i>
+        Observaciones registradas al atender
+      </h4>
+      {% for obs in observaciones_atendidas %}
+      <div style="border-left:3px solid #1ABC9C;background:#F8FFFE;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+          <span class="badge badge-green">Atendida</span>
+          <span class="badge {% if 'Omis' in obs.tipo_alerta %}badge-red{% else %}badge-yellow{% endif %}">
+            {{ obs.tipo_alerta }}
+          </span>
+          <span style="font-size:11px;color:#9CA3AF;">{{ obs.medicamento }}</span>
+          <span style="font-size:11px;color:#9CA3AF;margin-left:auto;">{{ obs.fecha }}</span>
+        </div>
+        <p style="font-size:13px;color:#2C3E50;margin:0;line-height:1.5;">
+          <i data-lucide="message-square" style="width:12px;height:12px;color:#5D6D7E;vertical-align:middle;margin-right:4px;"></i>
+          {{ obs.observacion }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+
+<!-- ════ MODAL NUEVA RECETA ════ -->
+<div id="modal-nueva-receta" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-nueva-receta')">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">Nueva Receta — {{ paciente.nombre }}</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-nueva-receta')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('doctor_receta_crear', id=id) }}">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Fecha emisión *</label>
+            <input class="form-control" type="date" name="fecha_emision" value="2026-04-15" required/>
+          </div>
+          <div class="form-group"><!-- spacer --></div>
+          <div class="form-group">
+            <label class="form-label">Fecha inicio *</label>
+            <input class="form-control" type="date" name="fecha_inicio" value="2026-04-15" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha fin *</label>
+            <input class="form-control" type="date" name="fecha_fin" value="2026-07-15" required/>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid rgba(0,0,0,.06);padding-top:16px;margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-weight:600;font-size:14px;color:#2C3E50;">Medicamentos</span>
+            <button class="btn btn-ghost btn-sm" onclick="addMedPerfil()" type="button">
+              <i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar
+            </button>
+          </div>
+          <div id="meds-list-perfil">
+            <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;">
+              <div style="display:grid;grid-template-columns:2fr 80px 110px 80px 80px 80px auto;gap:8px;align-items:end;">
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Medicamento *</label>
+                  <select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required>
+                    <option value="">— Seleccionar —</option>
+                    {% for m in medicamentos_cat %}
+                    <option value="{{ m[0] }}">{{ m[1] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Dosis</label>
+                  <input class="form-control" name="dosis[]" type="number" min="1"
+                    value="500" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Unidad</label>
+                  <select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">
+                    {% for u in unidades_cat %}
+                    <option value="{{ u[0] }}"{% if loop.first %} selected{% endif %}>{{ u[1] }} — {{ u[2] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Frec. (h)</label>
+                  <input class="form-control" name="frecuencia[]" type="number"
+                    value="12" min="1" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">Tol. (min)</label>
+                  <input class="form-control" name="tolerancia[]" type="number"
+                    value="30" min="0" style="height:38px;font-size:13px;"/>
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label" style="font-size:11px;">1ª toma</label>
+                  <input class="form-control" name="hora[]" type="time"
+                    value="08:00" style="height:38px;font-size:13px;"/>
+                </div>
+                <button onclick="this.closest('.med-row').remove()" type="button"
+                  style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+                  <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-nueva-receta')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:15px;height:15px;"></i> Guardar Receta
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+{% set adh_p = (pct_mongo if pct_mongo is defined and pct_mongo > 0 else (paciente.pct|float if paciente.pct is not none else 0))|round|int %}
+{% if adh_p > 0 %}
+{% set clr_p = '#1ABC9C' if adh_p >= 80 else ('#F39C12' if adh_p >= 50 else '#E74C3C') %}
+Highcharts.chart('gauge_perfil', {
+  chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 90, margin: [0,0,0,0], spacing: [0,0,0,0] },
+  title: null,
+  pane: { center: ['50%','85%'], size: '100%', startAngle: -90, endAngle: 90,
+    background: { backgroundColor: '#EEF2F7', innerRadius: '55%', outerRadius: '100%', shape: 'arc', borderWidth: 0 } },
+  tooltip: { enabled: false },
+  yAxis: { min: 0, max: 100, lineWidth: 0, tickWidth: 0, minorTickInterval: null, labels: { enabled: false } },
+  plotOptions: { solidgauge: { dataLabels: { y: -18, borderWidth: 0, useHTML: true }, rounded: true } },
+  series: [{ name: 'Adherencia', data: [{{ adh_p }}], color: '{{ clr_p }}',
+    dataLabels: { format: '<span style="font-size:13px;font-weight:700;color:{{ clr_p }}">{y}%</span>' } }],
+  credits: { enabled: false }
+});
+{% else %}
+document.getElementById('gauge_perfil').innerHTML =
+  '<div style="height:90px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9CA3AF;text-align:center;line-height:1.4;">Sin<br>datos</div>';
+{% endif %}
+
+function desasignarCuidador(id_pac_cuid, nombre) {
+  document.getElementById('del-vinculo-id').value = id_pac_cuid;
+  document.getElementById('del-vinculo-nombre').textContent = '¿Desasignar a ' + nombre + '?';
+  document.getElementById('modal-desasignar').style.display = 'flex';
+}
+
+// Tabs
+function showTab(id, btn) {
+  ['tab-recetas','tab-eventos','tab-cuids','tab-alertas'].forEach(function(t) {
+    document.getElementById(t).style.display = 'none';
+    var b = document.getElementById('btn-' + t);
+    if(b){ b.style.color='#5D6D7E'; b.style.borderBottom='2px solid transparent'; }
+  });
+  document.getElementById(id).style.display = 'block';
+  btn.style.color = '#1B4F72';
+  btn.style.borderBottom = '2px solid #1B4F72';
+}
+
+// Al cargar, si viene filtro_alertas en la URL, activar tab alertas
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('filtro_alertas')) {
+        const btn = document.getElementById('btn-tab-alertas');
+        if (btn) showTab('tab-alertas', btn);
+    }
+});
+
+function addMedPerfil() {
+  var list = document.getElementById('meds-list-perfil');
+
+  // Clonar opciones desde la primera fila del DOM
+  var srcMed  = list.querySelector('select[name="med_id[]"]');
+  var medOpts = '';
+  if (srcMed) {
+    Array.from(srcMed.options).forEach(function(o) {
+      medOpts += '<option value="' + o.value + '">' + o.text + '</option>';
+    });
+  }
+  var srcUni  = list.querySelector('select[name="unidad[]"]');
+  var uniOpts = '';
+  if (srcUni) {
+    Array.from(srcUni.options).forEach(function(o, i) {
+      uniOpts += '<option value="' + o.value + '"' + (i === 0 ? ' selected' : '') + '>' + o.text + '</option>';
+    });
+  }
+
+  var div = document.createElement('div');
+  div.className = 'med-row';
+  div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:8px;';
+  div.innerHTML = '<div style="display:grid;grid-template-columns:2fr 80px 110px 80px 80px 80px auto;gap:8px;align-items:end;">'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Medicamento *</label>'
+    + '<select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required>' + medOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>'
+    + '<input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad</label>'
+    + '<select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">' + uniOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>'
+    + '<input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>'
+    + '<input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>'
+    + '<input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>'
+    + '<button onclick="this.closest(\'.med-row\').remove()" type="button"'
+    + ' style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">'
+    + '<i data-lucide="trash-2" style="width:15px;height:15px;"></i></button>'
+    + '</div>';
+  list.appendChild(div);
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

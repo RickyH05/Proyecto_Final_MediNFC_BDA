@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Mapa de Proximidad{% endblock %}
+{% block page_title %}Mapa de Proximidad{% endblock %}
+{% block content %}
+<div style="margin-bottom:20px;">
+  <p style="font-size:14px;color:#5D6D7E;">Visualización de beacons BLE y posiciones GPS de cuidadores</p>
+</div>
+
+{% set total_bec  = puntos | selectattr('beacon.lat') | list | length %}
+
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
+  <!-- Mapa Leaflet -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Mapa interactivo</h3>
+      <div style="display:flex;gap:12px;font-size:12px;color:#5D6D7E;">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1B4F72;vertical-align:middle;margin-right:4px;"></span>Beacon</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1ABC9C;vertical-align:middle;margin-right:4px;"></span>GPS cuidador</span>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0 16px 16px;">
+      <div id="map" style="height:440px;border-radius:8px;position:relative;"></div>
+    <div id="gps-refresh-ts"
+         style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+                background:rgba(255,255,255,.85);border-radius:4px;padding:2px 8px;
+                font-size:11px;color:#5D6D7E;z-index:1000;pointer-events:none;display:none;">
+      Actualizado: <span id="gps-ts-valor">--</span>
+    </div>
+    </div>
+  </div>
+
+  <!-- Panel lateral -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div class="card">
+      <div class="card-header"><h3>Estadísticas</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;background:#F4F6F8;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(27,79,114,.10);display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="radio" style="width:16px;height:16px;color:#1B4F72;"></i>
+            </div>
+            <span style="font-size:13px;color:#5D6D7E;">Beacons con datos</span>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1B4F72;">{{ total_bec }}</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;background:#F4F6F8;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(26,188,156,.12);display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="smartphone" style="width:16px;height:16px;color:#1ABC9C;"></i>
+            </div>
+            <span style="font-size:13px;color:#5D6D7E;">Con posición GPS</span>
+          </div>
+          <span id="contador-gps" style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#1ABC9C;">{{ con_gps }}</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;background:#F4F6F8;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(142,68,173,.10);display:flex;align-items:center;justify-content:center;">
+              <i data-lucide="users" style="width:16px;height:16px;color:#8E44AD;"></i>
+            </div>
+            <span style="font-size:13px;color:#5D6D7E;">Total pacientes</span>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#8E44AD;">{{ puntos | length }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Pacientes</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;">
+        {% for p in puntos %}
+        <div style="padding:10px 12px;border-radius:8px;background:#F9FAFB;border:1px solid #EEF0F3;">
+          <div style="font-weight:700;font-size:13px;color:#2C3E50;margin-bottom:6px;">{{ p.paciente }}</div>
+          {% if p.cuidadores %}
+            {% for c in p.cuidadores %}
+            <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">
+              {% if c.es_principal %}
+              <span style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:#1ABC9C;border-radius:4px;padding:1px 5px;line-height:16px;">Principal</span>
+              {% else %}
+              <span style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:#5DADE2;border-radius:4px;padding:1px 5px;line-height:16px;">Secundaria</span>
+              {% endif %}
+              <div style="min-width:0;">
+                <div style="font-size:12px;color:#2C3E50;font-weight:500;">{{ c.nombre }}</div>
+                {% if c.gps_lat %}
+                <div style="font-size:11px;color:#1ABC9C;font-family:monospace;">
+                  {{ "%.4f"|format(c.gps_lat) }}, {{ "%.4f"|format(c.gps_lon) }}
+                </div>
+                {% else %}
+                <div style="font-size:11px;color:#9CA3AF;">Sin posición GPS</div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div style="font-size:12px;color:#9CA3AF;">Sin cuidadores asignados</div>
+          {% endif %}
+        </div>
+        {% else %}
+        <p style="color:#9CA3AF;font-size:13px;text-align:center;padding:16px;">Sin pacientes asignados.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+lucide.createIcons();
+var puntos = {{ puntos | tojson }};
+var map = L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+// Índice de marcadores GPS por id_cuidador para actualización en vivo
+var marcadoresGPS = {};
+
+// Índice id_cuidador → nombre para actualización en vivo
+var nombreCuidador = {};
+puntos.forEach(function(p) {
+  (p.cuidadores || []).forEach(function(c) {
+    if (c.nombre) nombreCuidador[c.nombre] = c.nombre;
+  });
+});
+
+var bounds = [];
+puntos.forEach(function(p) {
+  if (p.beacon && p.beacon.lat) {
+    var bec = L.circleMarker([p.beacon.lat, p.beacon.lon], {
+      radius: 10, color: '#1B4F72', fillColor: '#1B4F72', fillOpacity: 0.7, weight: 2
+    }).addTo(map);
+    bec.bindPopup('<b>' + p.paciente + '</b><br>Beacon #' + p.beacon.id + '<br>Radio: ' + p.beacon.radio + 'm');
+    L.circle([p.beacon.lat, p.beacon.lon], {
+      radius: p.beacon.radio, color: '#1B4F72', fillColor: '#1B4F72', fillOpacity: 0.05, weight: 1, dashArray: '6 3'
+    }).addTo(map);
+    bounds.push([p.beacon.lat, p.beacon.lon]);
+  }
+  (p.cuidadores || []).forEach(function(c) {
+    if (c.gps_lat && !marcadoresGPS[c.nombre]) {
+      var isPrincipal = c.es_principal;
+      var gps = L.circleMarker([c.gps_lat, c.gps_lon], {
+        radius:      isPrincipal ? 8 : 6,
+        color:       isPrincipal ? '#1ABC9C' : '#7DCEA0',
+        fillColor:   isPrincipal ? '#1ABC9C' : '#A9DFBF',
+        fillOpacity: isPrincipal ? 0.85 : 0.55,
+        weight:      isPrincipal ? 2 : 1.5
+      }).addTo(map);
+      var label = isPrincipal ? 'Principal' : 'Secundaria';
+      gps.bindPopup('<b>' + (c.nombre || 'Cuidador') + '</b> <small>(' + label + ')</small><br>Paciente: ' + p.paciente + '<br>' + (c.gps_ts || ''));
+      bounds.push([c.gps_lat, c.gps_lon]);
+      marcadoresGPS[c.nombre] = gps;
+    }
+  });
+});
+if (bounds.length > 0) {
+  map.fitBounds(bounds, {padding: [30, 30]});
+} else {
+  map.setView([25.6866, -100.3161], 12);
+}
+
+
+
+// Actualización en vivo cada 20 segundos
+function refrescarGPS() {
+  fetch('/api/gps/posiciones')
+    .then(function(r) { return r.json(); })
+    .then(function(lista) {
+      if (!Array.isArray(lista)) return;
+      lista.forEach(function(pos) {
+        var id     = pos.id_cuidador;
+        var latlng = [pos.lat, pos.lon];
+        // Actualizar diccionario de nombres con dato fresco del servidor
+        if (pos.nombre) nombreCuidador[id] = pos.nombre;
+        var nombre = nombreCuidador[id] || ('Cuidador #' + id);
+        var popup  = '<b>' + nombre + '</b><br>' + pos.ts;
+        if (marcadoresGPS[id]) {
+          marcadoresGPS[id].setLatLng(latlng);
+          marcadoresGPS[id].getPopup().setContent(popup);
+        } else {
+          var m = L.circleMarker(latlng, {
+            radius: 7, color: '#1ABC9C', fillColor: '#1ABC9C', fillOpacity: 0.85, weight: 2
+          }).addTo(map);
+          m.bindPopup(popup);
+          marcadoresGPS[id] = m;
+        }
+      });
+      var ahora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      document.getElementById('gps-ts-valor').textContent = ahora;
+      document.getElementById('gps-refresh-ts').style.display = 'block';
+    })
+    .catch(function(e) { console.warn('Error al refrescar GPS:', e); });
+}
+
+setInterval(refrescarGPS, 20000);
+</script>
+{% endblock %}

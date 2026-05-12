@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Recetas{% endblock %}
+{% block page_title %}Recetas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div><h1>Recetas</h1><p>{{ recetas|length }} prescripciones</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-receta')">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nueva Receta
+  </button>
+</div>
+
+<!-- Filtros -->
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+  <select class="form-control" style="max-width:220px;">
+    <option>Todos los pacientes</option>
+    {% for p in pacientes %}
+    <option>{{ p[1] }}</option>
+    {% endfor %}
+  </select>
+  <div class="filter-pills" style="margin:0;">
+    <span class="pill active">Todas</span>
+    <span class="pill">Vigentes</span>
+    <span class="pill">Vencidas</span>
+    <span class="pill">Canceladas</span>
+  </div>
+</div>
+
+<!-- Lista de recetas -->
+<div style="display:flex;flex-direction:column;gap:14px;">
+  {% for rx in recetas %}
+  <div style="background:#ffffff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid {% if rx.estado=='vigente' %}#1ABC9C{% elif rx.estado=='vencida' %}#9CA3AF{% else %}#E74C3C{% endif %};">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-weight:700;font-size:15px;color:#2C3E50;">{{ rx.pac_nombre }}</div>
+        <div style="font-size:13px;color:#5D6D7E;margin-top:2px;">
+          {{ session.nombre }} &nbsp;·&nbsp; {{ rx.ini }} → {{ rx.fin }}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge {% if rx.estado=='vigente' %}badge-green{% elif rx.estado=='vencida' %}badge-gray{% else %}badge-red{% endif %}">
+          {{ rx.estado|capitalize }}
+        </span>
+      </div>
+    </div>
+    <!-- Medicamentos -->
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      {% for m in rx.meds %}
+      <div style="background:#F4F6F8;border-radius:6px;padding:8px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+        <span style="font-weight:600;font-size:13px;color:#2C3E50;">{{ m.nombre }}</span>
+        <span style="font-size:12px;color:#5D6D7E;">Cada {{ m.freq }}</span>
+        <span style="font-size:12px;color:#5D6D7E;display:flex;align-items:center;gap:4px;">
+          <i data-lucide="clock" style="width:12px;height:12px;"></i> {{ m.hora }}
+        </span>
+      </div>
+      {% else %}
+      <div style="font-size:13px;color:#9CA3AF;padding:4px 0;">Sin medicamentos registrados.</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div style="text-align:center;color:#9CA3AF;padding:40px;">No hay recetas registradas.</div>
+  {% endfor %}
+</div>
+
+<!-- MODAL Nueva Receta -->
+<div id="modal-receta" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-receta')">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">Nueva Receta</span>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-receta')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('doctor_receta_desde_lista') }}">
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+        <div class="form-group">
+          <label class="form-label">Paciente *</label>
+          <select class="form-control" name="id_paciente" required>
+            <option value="">— Seleccionar —</option>
+            {% for p in pacientes %}
+            <option value="{{ p[0] }}">{{ p[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Médico</label>
+          <input class="form-control" value="{{ session.nombre }}" readonly style="background:#F4F6F8;"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha emisión *</label>
+          <input class="form-control" type="date" name="fecha_emision" required/>
+        </div>
+        <div class="form-group"><!-- spacer --></div>
+        <div class="form-group">
+          <label class="form-label">Fecha inicio *</label>
+          <input class="form-control" type="date" name="fecha_inicio" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha fin *</label>
+          <input class="form-control" type="date" name="fecha_fin" required/>
+        </div>
+      </div>
+      <div style="border-top:1px solid rgba(0,0,0,.06);padding-top:16px;margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-weight:600;font-size:14px;color:#2C3E50;">Medicamentos</span>
+          <button class="btn btn-ghost btn-sm" onclick="addMedRec()" type="button">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> Agregar
+          </button>
+        </div>
+        <div id="meds-list-rec">
+          <div class="med-row" style="border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;">
+            <div style="display:grid;grid-template-columns:2fr 80px 100px 70px 70px 80px 130px auto;gap:8px;align-items:end;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Medicamento *</label>
+                <select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required onchange="updateDosisMax(this)">
+                  <option value="">— Seleccionar medicamento —</option>
+                  {% for m in medicamentos %}
+                  <option value="{{ m[0] }}" data-dosis-max="{{ m[2] if m|length > 2 else '' }}">{{ m[1] }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Dosis</label>
+                <input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/>
+                <small class="dosis-max-hint" style="font-size:10px;color:#9CA3AF;"></small>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Unidad</label>
+                <select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">
+                  {% for u in unidades %}
+                  <option value="{{ u[0] }}"{% if loop.first %} selected{% endif %}>{{ u[1] }} — {{ u[2] }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Frec. (h)</label>
+                <input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">Tol. (min)</label>
+                <input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:11px;">1ª toma</label>
+                <input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/>
+              </div>
+              <button onclick="this.closest('.med-row').remove()" type="button"
+                style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">
+                <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modal-receta')">Cancelar</button>
+      <button type="submit" class="btn btn-primary">
+        <i data-lucide="save" style="width:15px;height:15px;"></i> Crear Receta
+      </button>
+    </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+lucide.createIcons();
+
+function updateDosisMax(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var max = opt ? opt.getAttribute('data-dosis-max') : '';
+  var hint = sel.closest('.med-row').querySelector('.dosis-max-hint');
+  if (hint) hint.textContent = max ? 'Máx: ' + max : '';
+}
+
+function addMedRec() {
+  var list = document.getElementById('meds-list-rec');
+
+  // Clonar opciones de medicamento desde la primera fila
+  var srcMed  = list.querySelector('select[name="med_id[]"]');
+  var medOpts = '';
+  if (srcMed) {
+    Array.from(srcMed.options).forEach(function(o) {
+      medOpts += '<option value="' + o.value + '" data-dosis-max="' + (o.getAttribute('data-dosis-max') || '') + '">' + o.text + '</option>';
+    });
+  }
+
+  // Clonar opciones de unidad desde la primera fila
+  var srcUni  = list.querySelector('select[name="unidad[]"]');
+  var uniOpts = '';
+  if (srcUni) {
+    Array.from(srcUni.options).forEach(function(o, i) {
+      uniOpts += '<option value="' + o.value + '"' + (i === 0 ? ' selected' : '') + '>' + o.text + '</option>';
+    });
+  }
+
+  var div = document.createElement('div');
+  div.className = 'med-row';
+  div.style.cssText = 'border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:12px;margin-bottom:10px;';
+  div.innerHTML = '<div style="display:grid;grid-template-columns:2fr 80px 100px 70px 70px 80px 130px auto;gap:8px;align-items:end;">'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Medicamento *</label>'
+    + '<select class="form-control" name="med_id[]" style="height:38px;font-size:13px;" required onchange="updateDosisMax(this)">' + medOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Dosis</label>'
+    + '<input class="form-control" name="dosis[]" type="number" min="1" value="500" style="height:38px;font-size:13px;"/>'
+    + '<small class="dosis-max-hint" style="font-size:10px;color:#9CA3AF;"></small></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Unidad</label>'
+    + '<select class="form-control" name="unidad[]" style="height:38px;font-size:13px;">' + uniOpts + '</select></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Frec. (h)</label>'
+    + '<input class="form-control" name="frecuencia[]" type="number" value="12" min="1" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">Tol. (min)</label>'
+    + '<input class="form-control" name="tolerancia[]" type="number" value="30" min="0" style="height:38px;font-size:13px;"/></div>'
+    + '<div class="form-group" style="margin:0;"><label class="form-label" style="font-size:11px;">1ª toma</label>'
+    + '<input class="form-control" name="hora[]" type="time" value="08:00" style="height:38px;font-size:13px;"/></div>'
+    + '<button onclick="this.closest(\'.med-row\').remove()" type="button"'
+    + ' style="background:none;border:none;cursor:pointer;color:#E74C3C;padding:4px;height:38px;display:flex;align-items:center;">'
+    + '<i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>'
+    + '</div>';
+  list.appendChild(div);
+  lucide.createIcons();
+}
+</script>
+{% endblock %}

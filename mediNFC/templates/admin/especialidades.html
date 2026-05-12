@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Especialidades{% endblock %}
+{% block page_title %}Especialidades{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Especialidades</h1><p>Especialidades medicas del sistema</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-esp');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nueva
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Descripcion</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for e in especialidades %}
+        {# e: (0=id, 1=descripcion) #}
+        <tr data-searchable>
+          <td style="color:#9CA3AF;font-size:13px;">{{ e[0] }}</td>
+          <td style="font-weight:500;">{{ e[1] }}</td>
+          <td style="text-align:right;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editEsp({{ e[0] }},'{{ e[1]|e }}')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nueva/editar especialidad -->
+<div id="modal-esp" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-esp')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-esp-title">Nueva Especialidad</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-esp')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_especialidades') }}">
+      <input type="hidden" id="esp-acc" name="acc" value="I">
+      <input type="hidden" id="esp-id" name="id_especialidad" value="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Descripcion *</label>
+          <input class="form-control" id="esp-desc" name="descripcion" placeholder="Ej: Geriatria"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-esp')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-esp-title').textContent='Nueva Especialidad';
+  document.getElementById('esp-acc').value='I';
+  document.getElementById('esp-id').value='';
+  document.getElementById('esp-desc').value='';
+}
+function editEsp(id,desc){
+  document.getElementById('modal-esp-title').textContent='Editar Especialidad';
+  document.getElementById('esp-acc').value='U';
+  document.getElementById('esp-id').value=id;
+  document.getElementById('esp-desc').value=desc;
+  openModal('modal-esp'); lucide.createIcons();
+}
+</script>
+{% endblock %}

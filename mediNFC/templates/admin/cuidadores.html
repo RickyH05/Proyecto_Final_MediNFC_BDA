@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Cuidadores{% endblock %}
+{% block page_title %}Cuidadores{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1>Cuidadores</h1><p>Gestion de cuidadores registrados</p></div>
+  <button class="btn btn-primary" onclick="openModal('modal-cuid');setModoNuevo()">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i> Nuevo
+  </button>
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i data-lucide="search" class="search-icon" style="width:15px;height:15px;"></i>
+    <input id="search-input" class="form-control" placeholder="Buscar por nombre o correo..."/>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:44px;"></th>
+        <th>Nombre</th><th>Tipo</th><th>Telefono</th><th>Correo</th>
+        <th>Estado</th><th style="text-align:right;">Acciones</th>
+      </tr></thead>
+      <tbody>
+        {% for c in cuidadores %}
+        {# c: (0=id, 1=nombre, 2=apellido_p, 3=apellido_m, 4=tipo, 5=telefono, 6=email, 7=activo, 8=foto_perfil) #}
+        <tr data-searchable>
+          <td>{{ avatar(c[8], c[1] ~ ' ' ~ c[2], 34) }}</td>
+          <td style="font-weight:500;">{{ c[1] }} {{ c[2] }} {{ c[3] }}</td>
+          <td>
+            <span class="badge {% if c[4]=='formal' %}badge-blue{% else %}badge-gray{% endif %}">{{ c[4]|capitalize }}</span>
+          </td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c[5] }}</td>
+          <td style="font-size:13px;color:#5D6D7E;">{{ c[6] }}</td>
+          <td>
+            {% if c[7] %}<span class="badge badge-green">Activo</span>
+            {% else %}<span class="badge badge-gray">Inactivo</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-ghost btn-icon btn-sm" title="Editar"
+              onclick="editCuid({{ c[0] }},'{{ c[1]|e }}','{{ c[2]|e }}','{{ c[3]|e }}','{{ c[4] }}','{{ c[5]|e }}','{{ c[6]|e }}')">
+              <i data-lucide="edit-2" style="width:14px;height:14px;color:#5D6D7E;"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
+              onclick="openConfirm({{ c[0] }},'Eliminar a {{ c[1]|e }} {{ c[2]|e }}?','Se desactivara el cuidador del sistema.')">
+              <i data-lucide="trash-2" style="width:14px;height:14px;color:#E74C3C;"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo / editar -->
+<div id="modal-cuid" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-cuid')">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-cuid-title">Nuevo Cuidador</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-cuid')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_cuidadores') }}" enctype="multipart/form-data">
+      <input type="hidden" id="c-acc" name="acc" value="I">
+      <input type="hidden" id="c-id" name="id_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Nombre *</label>
+            <input class="form-control" id="c-nombre" name="nombre"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Paterno *</label>
+            <input class="form-control" id="c-apP" name="apellido_p"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ap. Materno</label>
+            <input class="form-control" id="c-apM" name="apellido_m"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select class="form-control" id="c-tipo" name="tipo">
+              <option value="formal">Formal</option>
+              <option value="informal">Informal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telefono</label>
+            <input class="form-control" id="c-tel" name="telefono" placeholder="+52 55 0000 0000"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo electronico *</label>
+          <input class="form-control" id="c-email" name="email" type="text" placeholder="correo@dominio.com"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Foto de perfil</label>
+          <input class="form-control" type="file" name="foto" accept="image/png,image/jpeg,image/webp"/>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">PNG, JPG o WEBP · máx. 2 MB</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-cuid')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal confirmar eliminar -->
+<div id="modal-confirm" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-confirm')">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#E74C3C;">Confirmar eliminacion</span>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-confirm')">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_cuidadores') }}">
+      <input type="hidden" name="acc" value="D">
+      <input type="hidden" id="del-id-cuid" name="id_cuidador" value="">
+      <div class="modal-body">
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(231,76,60,.10);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i data-lucide="alert-triangle" style="width:24px;height:24px;color:#E74C3C;"></i>
+          </div>
+          <div>
+            <div id="confirm-title" style="font-weight:600;font-size:15px;color:#2C3E50;margin-bottom:6px;"></div>
+            <div id="confirm-msg"   style="font-size:14px;color:#5D6D7E;line-height:1.5;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Eliminar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script>
+lucide.createIcons();
+function setModoNuevo(){
+  document.getElementById('modal-cuid-title').textContent='Nuevo Cuidador';
+  document.getElementById('c-acc').value='I';
+  document.getElementById('c-id').value='';
+  ['c-nombre','c-apP','c-apM','c-tel','c-email'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('c-tipo').value='formal';
+}
+function editCuid(id,nombre,apP,apM,tipo,tel,email){
+  document.getElementById('modal-cuid-title').textContent='Editar Cuidador';
+  document.getElementById('c-acc').value='U';
+  document.getElementById('c-id').value=id;
+  document.getElementById('c-nombre').value=nombre;
+  document.getElementById('c-apP').value=apP;
+  document.getElementById('c-apM').value=apM;
+  document.getElementById('c-tipo').value=tipo;
+  document.getElementById('c-tel').value=tel;
+  document.getElementById('c-email').value=email;
+  openModal('modal-cuid'); lucide.createIcons();
+}
+function openConfirm(id,title,msg){
+  document.getElementById('del-id-cuid').value=id;
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  openModal('modal-confirm'); lucide.createIcons();
+}
+</script>{% endblock %}

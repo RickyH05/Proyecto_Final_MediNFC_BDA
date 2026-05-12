@@ -1,0 +1,12 @@
+# .gitignore
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+
+
+# Fotos de perfil subidas por usuarios
+static/img/uploads/*
+!static/img/uploads/.gitkeep

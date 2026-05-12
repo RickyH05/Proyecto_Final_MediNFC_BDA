@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Mi Dispositivo GPS{% endblock %}
+{% block page_title %}Mi Dispositivo GPS{% endblock %}
+{% block content %}
+<a href="{{ url_for('cuidador_home') }}" class="btn btn-ghost btn-sm" style="margin-bottom:16px;">
+  <i data-lucide="arrow-left" style="width:15px;height:15px;"></i> Volver
+</a>
+
+{% if gps %}
+<!-- Status card -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+      <div style="width:52px;height:52px;border-radius:14px;background:rgba(27,79,114,.10);display:flex;align-items:center;justify-content:center;">
+        <i data-lucide="smartphone" style="width:26px;height:26px;color:#1B4F72;"></i>
+      </div>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:600;font-size:16px;">{{ gps.modelo }}</span>
+          {% if gps.activo %}
+          <span class="badge badge-green">Conectado</span>
+          {% else %}
+          <span class="badge badge-gray">Inactivo</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="background:#F4F6F8;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:#5D6D7E;font-weight:500;">IMEI</div>
+        <div style="font-family:monospace;font-size:13px;font-weight:600;margin-top:2px;">{{ gps.imei }}</div>
+      </div>
+      <div style="background:#F4F6F8;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:#5D6D7E;font-weight:500;">Modelo</div>
+        <div style="font-size:13px;font-weight:600;margin-top:2px;">{{ gps.modelo }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if ultima_ubicacion %}
+<!-- Última ubicación -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header">
+    <h3>Última Ubicación</h3>
+    <span style="font-size:12px;color:#5D6D7E;">{{ ultima_ubicacion.ts }}</span>
+  </div>
+  <div class="card-body">
+    <div id="map" style="height:400px;width:100%;border-radius:8px;margin-bottom:12px;z-index:0;"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(26,188,156,.06);border:1px solid rgba(26,188,156,.15);border-radius:8px;">
+      <i data-lucide="map-pin" style="width:16px;height:16px;color:#1ABC9C;flex-shrink:0;"></i>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#2C3E50;">Lat: {{ ultima_ubicacion.lat }}, Lng: {{ ultima_ubicacion.lon }}</div>
+        <div style="font-size:11px;color:#5D6D7E;">Última posición registrada</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Timeline posiciones -->
+{% if posiciones %}
+<div class="card">
+  <div class="card-header"><h3>Posiciones Recientes</h3></div>
+  <div class="card-body">
+    <div class="timeline">
+      {% for pos in posiciones %}
+      <div class="timeline-item">
+        <div class="timeline-spine">
+          <div style="font-size:11px;color:#5D6D7E;font-weight:600;white-space:nowrap;min-width:38px;">{{ pos.ts }}</div>
+          <div class="timeline-dot {% if loop.first %}green{% else %}gray{% endif %}" style="margin:6px 0 0;"></div>
+          <div class="timeline-line"></div>
+        </div>
+        <div class="timeline-content" style="padding-left:4px;">
+          <div class="timeline-card" style="border-left:3px solid {% if loop.first %}#1ABC9C{% else %}#E8ECF0{% endif %};">
+            <div style="font-weight:600;font-size:13px;color:#2C3E50;">{{ 'Posición actual' if loop.first else 'Posición anterior' }}</div>
+            <div style="font-family:monospace;font-size:11px;color:#9CA3AF;margin-top:2px;">{{ pos.lat }}, {{ pos.lon }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;color:#9CA3AF;">
+    <i data-lucide="smartphone" style="width:40px;height:40px;margin-bottom:12px;opacity:0.4;"></i>
+    <div style="font-size:15px;font-weight:600;">Sin dispositivo GPS asignado</div>
+    <div style="font-size:13px;margin-top:6px;">Contacta al administrador para asignar un dispositivo.</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+lucide.createIcons();
+{% if ultima_ubicacion %}
+var lat = {{ ultima_ubicacion.lat }};
+var lng = {{ ultima_ubicacion.lon }};
+var map = L.map('map').setView([lat, lng], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+L.marker([lat, lng]).addTo(map)
+  .bindPopup('Última posición — {{ ultima_ubicacion.ts }}')
+  .openPopup();
+{% for pos in posiciones %}
+{% if not loop.first %}
+L.circleMarker([{{ pos.lat }}, {{ pos.lon }}], { radius: 5, color: '#AEB6BF', fillOpacity: 0.7 })
+  .addTo(map).bindPopup('{{ pos.ts }}');
+{% endif %}
+{% endfor %}
+setTimeout(function(){ map.invalidateSize(); }, 100);
+{% endif %}
+</script>
+{% endblock %}
