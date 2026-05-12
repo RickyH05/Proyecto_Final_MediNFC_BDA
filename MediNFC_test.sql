@@ -4421,138 +4421,136 @@ END;
 $$;
 -- [SP 57] sp_gestion_etiqueta_nfc
 CREATE OR REPLACE PROCEDURE sp_gestion_etiqueta_nfc(
-        IN p_acc character,
-        INOUT p_uid character varying,
-        OUT p_ok integer,
-        OUT p_msg character varying,
-        INOUT io_cursor refcursor,
-        IN p_nombre character varying DEFAULT NULL::character varying,
-        IN p_tipo character varying DEFAULT NULL::character varying,
-        IN p_rm integer DEFAULT NULL::integer,
-        IN p_estado estado_etiqueta_enum DEFAULT 'activo'::estado_etiqueta_enum
-    ) LANGUAGE plpgsql AS $$ BEGIN p_ok := 0;
-p_msg := '';
-IF UPPER(p_acc) = 'I' THEN IF p_uid IS NULL
-OR p_nombre IS NULL
-OR p_tipo IS NULL
-OR p_rm IS NULL THEN p_ok := -1;
-p_msg := 'Campos obligatorios incompletos (uid, nombre, tipo, id_receta_medicamento).';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-RETURN;
-END IF;
-INSERT INTO etiqueta_nfc(
-        uid_nfc,
-        nombre,
-        tipo_etiqueta,
-        id_receta_medicamento,
-        estado_etiqueta
-    )
-VALUES(p_uid, p_nombre, p_tipo, p_rm, p_estado) ON CONFLICT (uid_nfc) DO NOTHING;
-p_ok := 1;
-p_msg := 'Etiqueta NFC registrada.';
-OPEN io_cursor FOR
-SELECT uid_nfc,
-    nombre,
-    tipo_etiqueta,
-    id_receta_medicamento,
-    estado_etiqueta,
-    fecha_registro
-FROM etiqueta_nfc
-WHERE uid_nfc = p_uid;
-ELSIF UPPER(p_acc) = 'U' THEN IF p_uid IS NULL THEN p_ok := -3;
-p_msg := 'Falta p_uid.';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-RETURN;
-END IF;
-IF NOT EXISTS (
-    SELECT 1
-    FROM etiqueta_nfc
-    WHERE uid_nfc = p_uid
-) THEN p_ok := -4;
-p_msg := 'Etiqueta no encontrada.';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-RETURN;
-END IF;
-UPDATE etiqueta_nfc
-SET estado_etiqueta = COALESCE(p_estado, estado_etiqueta),
-    nombre = COALESCE(p_nombre, nombre)
-WHERE uid_nfc = p_uid;
-p_ok := 1;
-p_msg := 'Etiqueta actualizada.';
-OPEN io_cursor FOR
-SELECT uid_nfc,
-    nombre,
-    tipo_etiqueta,
-    id_receta_medicamento,
-    estado_etiqueta,
-    fecha_registro
-FROM etiqueta_nfc
-WHERE uid_nfc = p_uid;
-ELSIF UPPER(p_acc) = 'L' THEN IF p_rm IS NULL THEN p_ok := -1;
-p_msg := 'Falta p_rm (id_receta_medicamento) para listar.';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-RETURN;
-END IF;
-p_uid := NULL;
-p_ok := 1;
-p_msg := 'Etiquetas listadas.';
-OPEN io_cursor FOR
-SELECT uid_nfc,
-    nombre,
-    tipo_etiqueta,
-    id_receta_medicamento,
-    estado_etiqueta,
-    fecha_registro
-FROM etiqueta_nfc
-WHERE id_receta_medicamento = p_rm
-ORDER BY fecha_registro DESC;
-ELSE p_ok := -99;
-p_msg := 'Acción no válida. Use I, U o L.';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-END IF;
-EXCEPTION
-WHEN unique_violation THEN p_ok := -10;
-p_msg := 'UID NFC duplicado.';
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-WHEN OTHERS THEN p_ok := -100;
-p_msg := 'Error: ' || SQLERRM;
-OPEN io_cursor FOR
-SELECT p_ok AS ok,
-    p_msg AS msg;
-END;
-$$;
--- [SP 58] sp_nfc_escaneo_desconocido
-
-CREATE OR REPLACE PROCEDURE sp_nfc_escaneo_desconocido(
-    IN  p_uid       VARCHAR(100),
-    IN  p_cuidador  INTEGER,
-    OUT p_ok        INTEGER,
-    OUT p_msg       VARCHAR,
-    INOUT io_cursor REFCURSOR
+    IN    p_acc     CHARACTER,
+    INOUT p_uid     CHARACTER VARYING,
+    OUT   p_ok      INTEGER,
+    OUT   p_msg     CHARACTER VARYING,
+    INOUT io_cursor REFCURSOR,
+    IN    p_nombre  CHARACTER VARYING        DEFAULT NULL,
+    IN    p_tipo    CHARACTER VARYING        DEFAULT NULL,
+    IN    p_rm      INTEGER                  DEFAULT NULL,
+    IN    p_estado  estado_etiqueta_enum     DEFAULT 'activo'
 )
 LANGUAGE plpgsql AS $$
 BEGIN
-    -- Si ya está vinculado, no hacer nada
-    IF EXISTS (SELECT 1 FROM etiqueta_nfc WHERE uid_nfc = p_uid) THEN
+    p_ok  := 0;
+    p_msg := '';
+
+    IF UPPER(p_acc) = 'I' THEN
+        IF p_uid IS NULL OR p_nombre IS NULL OR p_tipo IS NULL OR p_rm IS NULL THEN
+            p_ok  := -1;
+            p_msg := 'Campos obligatorios incompletos (uid, nombre, tipo, id_receta_medicamento).';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        INSERT INTO etiqueta_nfc(uid_nfc, nombre, tipo_etiqueta, id_receta_medicamento, estado_etiqueta)
+        VALUES (p_uid, p_nombre, p_tipo, p_rm, p_estado)
+        ON CONFLICT (uid_nfc) DO NOTHING;
+        p_ok  := 1;
+        p_msg := 'Etiqueta NFC registrada.';
+        OPEN io_cursor FOR
+            SELECT uid_nfc, nombre, tipo_etiqueta, id_receta_medicamento, estado_etiqueta, fecha_registro
+            FROM etiqueta_nfc WHERE uid_nfc = p_uid;
+
+    ELSIF UPPER(p_acc) = 'U' THEN
+        IF p_uid IS NULL THEN
+            p_ok  := -3;
+            p_msg := 'Falta p_uid.';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM etiqueta_nfc WHERE uid_nfc = p_uid) THEN
+            p_ok  := -4;
+            p_msg := 'Etiqueta no encontrada.';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        UPDATE etiqueta_nfc
+        SET estado_etiqueta = COALESCE(p_estado, estado_etiqueta),
+            nombre          = COALESCE(p_nombre, nombre)
+        WHERE uid_nfc = p_uid;
+        p_ok  := 1;
+        p_msg := 'Etiqueta actualizada.';
+        OPEN io_cursor FOR
+            SELECT uid_nfc, nombre, tipo_etiqueta, id_receta_medicamento, estado_etiqueta, fecha_registro
+            FROM etiqueta_nfc WHERE uid_nfc = p_uid;
+
+    ELSIF UPPER(p_acc) = 'D' THEN
+        -- Nueva acción: eliminar completamente la etiqueta y limpiar nfc_pendiente
+        IF p_uid IS NULL THEN
+            p_ok  := -3;
+            p_msg := 'Falta p_uid.';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM etiqueta_nfc WHERE uid_nfc = p_uid) THEN
+            p_ok  := -4;
+            p_msg := 'Etiqueta no encontrada.';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        DELETE FROM nfc_pendiente WHERE uid_nfc = p_uid;
+        DELETE FROM etiqueta_nfc  WHERE uid_nfc = p_uid;
+        p_ok  := 1;
+        p_msg := 'Etiqueta NFC eliminada. Ya puede reasignarse.';
+        OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+
+    ELSIF UPPER(p_acc) = 'L' THEN
+        IF p_rm IS NULL THEN
+            p_ok  := -1;
+            p_msg := 'Falta p_rm (id_receta_medicamento) para listar.';
+            OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+            RETURN;
+        END IF;
+        p_uid := NULL;
+        p_ok  := 1;
+        p_msg := 'Etiquetas listadas.';
+        OPEN io_cursor FOR
+            SELECT uid_nfc, nombre, tipo_etiqueta, id_receta_medicamento, estado_etiqueta, fecha_registro
+            FROM etiqueta_nfc
+            WHERE id_receta_medicamento = p_rm
+            ORDER BY fecha_registro DESC;
+
+    ELSE
+        p_ok  := -99;
+        p_msg := 'Acción no válida. Use I, U, D o L.';
+        OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+    END IF;
+
+EXCEPTION
+    WHEN unique_violation THEN
+        p_ok  := -10;
+        p_msg := 'UID NFC duplicado.';
+        OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+    WHEN OTHERS THEN
+        p_ok  := -100;
+        p_msg := 'Error: ' || SQLERRM;
+        OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
+END;
+$$;
+
+-- [SP 58] sp_nfc_escaneo_desconocido
+
+CREATE OR REPLACE PROCEDURE sp_nfc_escaneo_desconocido(
+    IN    p_uid      VARCHAR(100),
+    IN    p_cuidador INTEGER,
+    OUT   p_ok       INTEGER,
+    OUT   p_msg      VARCHAR,
+    INOUT io_cursor  REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    -- Bloquear solo si existe y está activo
+    IF EXISTS (
+        SELECT 1 FROM etiqueta_nfc
+        WHERE uid_nfc = p_uid AND estado_etiqueta = 'activo'
+    ) THEN
         p_ok  := -1;
         p_msg := 'UID ya vinculado a un medicamento.';
         OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
         RETURN;
     END IF;
 
-    -- Insertar o incrementar intentos
     INSERT INTO nfc_pendiente (uid_nfc, id_cuidador)
     VALUES (p_uid, p_cuidador)
     ON CONFLICT (uid_nfc) DO UPDATE
@@ -4568,7 +4566,6 @@ EXCEPTION WHEN OTHERS THEN
     OPEN io_cursor FOR SELECT p_ok AS ok, p_msg AS msg;
 END;
 $$;
-
 -- [SP 59] sp_nfc_medicamentos_sin_vincular
 CREATE OR REPLACE PROCEDURE sp_nfc_medicamentos_sin_vincular(
     IN  p_cuidador  INTEGER,

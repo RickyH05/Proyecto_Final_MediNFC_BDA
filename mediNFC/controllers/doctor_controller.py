@@ -24,11 +24,27 @@ def doctor_dashboard():
 
     # ── Gráfica de adherencia — MongoDB ─────────────────────────────────────
     adherencia_mongo = get_adherencia_por_medico(id_medico, dias=14)
+
+    nombres_pg = {}
+    try:
+        conn_pg = get_db()
+        cur_pg  = conn_pg.cursor()
+        cur_pg.execute("BEGIN")
+        cur_pg.execute("CALL sp_rep_pacientes_medico('cur_pac_dash', %s)", [id_medico])
+        cur_pg.execute("FETCH ALL FROM cur_pac_dash")
+        for row in cur_pg.fetchall():
+            nombres_pg[row[1]] = f"{row[2]} {row[3]}"
+        conn_pg.commit()
+        cur_pg.close()
+        conn_pg.close()
+    except Exception:
+        nombres_pg = {}
+
     # Normalizar a lista de dicts con keys: _id, nombre, pct
     adherencia = [
         {
             "_id":    r.get("_id"),
-            "nombre": r.get("nombre") or f"Paciente {r.get('_id')}",
+            "nombre": nombres_pg.get(r.get("_id")) or r.get("nombre") or f"Paciente {r.get('_id')}",
             "pct":    round(r["pct"], 1) if r.get("pct") is not None else 0.0,
         }
         for r in adherencia_mongo
@@ -586,21 +602,21 @@ def doctor_nfc_desactivar(id_pac, uid):
         cur.execute("BEGIN")
         cur.execute("""
             CALL sp_gestion_etiqueta_nfc(
-                'U', %s, NULL, NULL, 'cur_nfc_desact',
-                NULL, NULL, NULL, 'inactivo'
+                'D', %s, NULL, NULL, 'cur_nfc_del'
             )
         """, [uid])
-        row    = cur.fetchone()
-        p_ok   = row[1] if row else -99
-        p_msg  = row[2] if row else "Sin respuesta del SP"
-        cur.execute("FETCH ALL FROM cur_nfc_desact")
+        row   = cur.fetchone()
+        p_ok  = row[1] if row else -99
+        p_msg = row[2] if row else "Sin respuesta del SP"
+        cur.execute("FETCH ALL FROM cur_nfc_del")
         if p_ok != 1:
             conn.rollback()
             flash(p_msg, "danger")
         else:
             conn.commit()
-            flash("Etiqueta NFC desactivada.", "success")
-        cur.close(); conn.close()
+            flash("Etiqueta NFC eliminada. Ya puede reasignarse a otro medicamento.", "success")
+        cur.close()
+        conn.close()
     except Exception as e:
         flash(str(e), "danger")
     return redirect(url_for("doctor_paciente_perfil", id=id_pac))
