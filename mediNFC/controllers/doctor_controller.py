@@ -6,7 +6,6 @@ from config import get_db, guardar_foto_perfil
 import json
 
 from mongo_client import (
-    get_adherencia_por_medico,
     get_pct_promedio_paciente,
     get_trayectos_todos_pacientes,
     registrar_log_sistema,
@@ -21,42 +20,37 @@ def doctor_dashboard():
     alertas_rec  = []
     alertas_pend = 0
     stats        = {"total_pac": 0, "bajo_80": 0, "recetas_vig": 0, "alertas_pend": 0}
+    adherencia   = []
 
-    # ── Gráfica de adherencia — MongoDB ─────────────────────────────────────
-    adherencia_mongo = get_adherencia_por_medico(id_medico, dias=14)
-
-    nombres_pg = {}
-    try:
-        conn_pg = get_db()
-        cur_pg  = conn_pg.cursor()
-        cur_pg.execute("BEGIN")
-        cur_pg.execute("CALL sp_rep_pacientes_medico('cur_pac_dash', %s)", [id_medico])
-        cur_pg.execute("FETCH ALL FROM cur_pac_dash")
-        for row in cur_pg.fetchall():
-            nombres_pg[row[1]] = f"{row[2]} {row[3]}"
-        conn_pg.commit()
-        cur_pg.close()
-        conn_pg.close()
-    except Exception:
-        nombres_pg = {}
-
-    # Normalizar a lista de dicts con keys: _id, nombre, pct
-    adherencia = [
-        {
-            "_id":    r.get("_id"),
-            "nombre": nombres_pg.get(r.get("_id")) or r.get("nombre") or f"Paciente {r.get('_id')}",
-            "pct":    round(r["pct"], 1) if r.get("pct") is not None else 0.0,
-        }
-        for r in adherencia_mongo
-    ]
-    stats["total_pac"] = len(adherencia)
-    stats["bajo_80"]   = sum(1 for p in adherencia if p["pct"] < 80)
-
-    # ── Alertas recientes — PostgreSQL ───────────────────────────────────────
     try:
         conn = get_db()
         cur  = conn.cursor()
 
+        # ── Adherencia — PostgreSQL (sp_rep_adherencia_medico) ───────────────
+        cur.execute("BEGIN")
+        cur.execute("CALL sp_rep_adherencia_pacientes_medico('cur_adh_dash', %s, %s)", [id_medico, 14])
+        cur.execute("FETCH ALL FROM cur_adh_dash")
+        rows_adh = cur.fetchall()
+        conn.commit()
+
+        pac_adh = {}
+        for r in rows_adh:
+            id_pac, paciente, _med, _total, ok, tarde, omitida, _pend, _pct = r
+            if id_pac not in pac_adh:
+                pac_adh[id_pac] = {"nombre": paciente, "ok": 0, "tarde": 0, "omitida": 0}
+            pac_adh[id_pac]["ok"]      += (ok      or 0)
+            pac_adh[id_pac]["tarde"]   += (tarde   or 0)
+            pac_adh[id_pac]["omitida"] += (omitida or 0)
+
+        for pid, p in pac_adh.items():
+            total_pas = p["ok"] + p["tarde"] + p["omitida"]
+            pct = round(100.0 * p["ok"] / total_pas, 1) if total_pas > 0 else 0.0
+            adherencia.append({"_id": pid, "nombre": p["nombre"], "pct": pct})
+
+        stats["total_pac"] = len(adherencia)
+        stats["bajo_80"]   = sum(1 for p in adherencia if p["pct"] < 80)
+
+        # ── Alertas recientes ────────────────────────────────────────────────
         cur.execute("BEGIN")
         cur.execute("CALL sp_rep_alertas_medico('cur_alert_doc', %s)", [id_medico])
         cur.execute("FETCH ALL FROM cur_alert_doc")
